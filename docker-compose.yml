@@ -1,0 +1,65 @@
+services:
+  # 1. MongoDB Database Service with Named Persistent Volume
+  mongodb:
+    image: mongo:7.0
+    container_name: awdf-mongodb-practical11
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # 2. Node.js & Express Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: awdf-backend-practical11
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      # Addresses MongoDB by service name inside Compose network (not localhost)
+      - MONGO_URI=mongodb://mongodb:27017/taskdb_docker
+      - JWT_SECRET=super_secret_jwt_key_charusat_itue301_24cs093_docker
+      - CLIENT_ORIGIN=http://localhost:5173
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # 3. React Frontend SPA Service (Nginx Multi-Stage Container)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: awdf-frontend-practical11
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+# Named volume guaranteeing data persistence across container recreation
+volumes:
+  mongodb_data:
+    name: awdf-mongodb-data-practical11
+
+# Internal bridge network for inter-container communication
+networks:
+  app-network:
+    name: awdf-app-network-practical11
+    driver: bridge
